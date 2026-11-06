@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MediaBase Objects ZIP Builder</title>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <style>
+    :root { color-scheme: dark; --bg:#0b1020; --panel:#121a2e; --line:#26334f; --text:#edf2ff; --muted:#9eacc8; --accent:#8b9cff; }
+    * { box-sizing:border-box }
+    body { margin:0; padding:32px 18px; background:radial-gradient(ellipse at top,#18264a 0,#0b1020 55%); color:var(--text); font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif; }
+    main { max-width:850px; margin:auto }
+    h1 { margin:0 0 8px; font-size:clamp(25px,5vw,38px); letter-spacing:-.04em }
+    p { color:var(--muted) }
+    .panel { margin-top:22px; padding:22px; border:1px solid var(--line); border-radius:16px; background:#121a2eee; box-shadow:0 18px 60px #0005 }
+    .actions { display:flex; flex-wrap:wrap; gap:10px; margin:18px 0 }
+    button { border:0; border-radius:10px; padding:11px 17px; font-weight:700; cursor:pointer; background:var(--accent); color:#0b1020 }
+    button.secondary { background:#26334f; color:var(--text) }
+    button:disabled { opacity:.5; cursor:not-allowed }
+    .bar { height:10px; border-radius:99px; background:#26334f; overflow:hidden; margin:12px 0 }
+    .bar span { display:block; width:0; height:100%; background:var(--accent); transition:width .15s }
+    #status { color:var(--text); font-weight:600 }
+    #log { max-height:310px; overflow:auto; padding:12px; border-radius:10px; background:#080d19; font:12px/1.6 ui-monospace,SFMono-Regular,monospace; white-space:pre-wrap; overflow-wrap:anywhere }
+    .hint { font-size:13px }
+    .count { display:inline-block; padding:3px 9px; border:1px solid var(--line); border-radius:99px; color:var(--muted); font-size:12px }
+  </style>
+</head>
+<body>
+<main>
+  <h1>MediaBase Objects ZIP Builder</h1>
+  <p>Downloads the listed media files and packages them into <strong>objects.zip</strong> using the requested folder structure. Everything runs in your browser.</p>
+  <div class="panel">
+    <span class="count" id="total">0 URLs</span>
+    <div class="actions">
+      <button id="build">Build objects.zip</button>
+      <button class="secondary" id="reset">Clear log</button>
+    </div>
+    <div class="bar"><span id="progress"></span></div>
+    <div id="status" role="status">Ready.</div>
+    <p class="hint">Banner files become <code>(banner-name)/splash.ext</code>. Other assets are placed under <code>etc/</code>, grouped by asset name. Failed downloads are listed below; the ZIP will still contain successful downloads.</p>
+    <div id="log" aria-live="polite">Waiting to start…</div>
+  </div>
+</main>
+<script>
+const urls = [
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/banners/empires-soul/splash.gif",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/banners/eternal-flame/splash.gif",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/banners/facecardi-jokery/splash.jpg",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/banners/flowertime/splash.gif",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/banners/funghoul/splash.gif",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/banners/hang-man/splash.jpg",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/banners/here-lies/splash.jpg",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/banners/moonlight-sunray/splash.gif",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/banners/pheonix-sour/splash.gif",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/banners/road-trip/splash.gif",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/banners/skull-full-of-krainium/splash.gif",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/banners/skull-to-crossbones/splash.gif",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/banners/soul-silver/splash.jpg",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/banners/spiral-of-reflection/splash.gif",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/banners/syndicate/splash.jpg",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/banners/thawedtodabase/splash.jpg",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/banners/the-pastful-presentful-future/splash.jpg",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/banners/the-weaping/splash.jpg",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/banners/toot-a-horn/splash.gif",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/banners/tropical-luminisence/splash.jpg",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/banners/vegas-racing/splash.gif",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/banners/vintrilaquest/splash.jpg",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/banners/walk-in-the-park/splash.jpg",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/banners/witch-hut/splash.gif",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/frames/eyepatch/splash.png",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/frames/golden/splash.png",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/themes/angelic/mainBg.jpg",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/themes/autumn-branch/mainBg.jpg",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/themes/balila/splash.png",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/themes/blood-castle/mainBg.jpg",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/themes/blood-moon/mainBg.jpg",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/themes/checkmate/splash.png",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/themes/cobweb/mainBg.jpg",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/themes/crimson-angel/mainBg.jpg",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/themes/crimson-shore/mainBg.gif",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/themes/crimson-skyline/mainBg.jpg",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/themes/death-by-sunrise/splash.jpg",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/themes/enitity-forest/splash.png",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/themes/falling-leaves/mainBg.gif",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/themes/frost-reaper/mainBg.jpg",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/themes/hallows-night/mainBg.jpg",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/themes/haunted-shrine/mainBg.gif",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/themes/malousios/splash.png",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/themes/pillars-o-thaw/mainBg.jpg",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/themes/pixel-cemetery/mainBg.gif",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/themes/pixel-grave/mainBg.jpg",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/themes/redux/footerBg.png",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/themes/redux/headerBg.png",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/themes/redux/mainBg.png",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/themes/redux/quoteBg.png",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/themes/rest-in-thaw/mainBg.jpg",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/themes/ruined-gate/mainBg.jpg",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/themes/sacrifice/splash.png",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/themes/sakiyama/mainBg.jpg",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/themes/scramble/mainBg.jpg",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/themes/seen-this-angel/mainBg.jpg",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/themes/shattered/mainBg.jpg",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/themes/skele-circle/mainBg.gif",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/themes/skele-swing/mainBg.gif",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/themes/spiral-stairway/mainBg.jpg",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/themes/vigils-nightmare/mainBg.jpg",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/wrappers/afterlife/splash.jpg",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/wrappers/antidote/splash.jpg",
+"https://raw.githubusercontent.com/wannasmile4evr/mediabaseWS/refs/heads/main/wrappers/falling-cards/splash.gif",
+"https://wannasmile4evr.github.io./assets/media/themes/cobweb/system-media/mainBg.jpg",
+"https://wannasmile4evr.github.io./assets/media/themes/redux/system-media/footerBg.png",
+"https://ws.ankomstudios.com/cloaks/canvas.png",
+"https://ws.ankomstudios.com/cloaks/classroom.png",
+"https://ws.ankomstudios.com/cloaks/docs.png",
+"https://ws.ankomstudios.com/cloaks/drive.png",
+"https://ws.ankomstudios.com/cloaks/google.png",
+"https://ws.ankomstudios.com/cloaks/newtab.png",
+"https://ws.ankomstudios.com/cloaks/outlook.png",
+"https://ws.ankomstudios.com/cloaks/schoology.png",
+"https://ws.ankomstudios.com/favicons/favicon.png",
+"https://ws.ankomstudios.com/themes/nexus/footer/splash.png",
+"https://ws.ankomstudios.com/themes/nexus/header/splash.png",
+"https://ws.ankomstudios.com/themes/nexus/main/splash.png",
+"https://ws.ankomstudios.com/themes/nexus/quote/splash.png"
+];
+
+function zipPath(url) {
+  const u = new URL(url);
+  const parts = decodeURIComponent(u.pathname).split("/").filter(Boolean);
+  const file = parts[parts.length - 1];
+  const ext = file.includes(".") ? file.slice(file.lastIndexOf(".") + 1) : "bin";
+
+  // Banners use the banner slug as the ZIP folder and always retain splash.ext.
+  const bannerIndex = parts.indexOf("banners");
+  if (bannerIndex !== -1 && parts[bannerIndex + 1]) {
+    return `${parts[bannerIndex + 1]}/splash.${ext}`;
+  }
+
+  // Group non-banner assets beneath etc/. Keep meaningful filenames such as
+  // mainBg/footerBg; files named splash use their containing folder as the name.
+  const systemMediaIndex = parts.indexOf("system-media");
+  if (systemMediaIndex !== -1) {
+    const theme = parts[systemMediaIndex - 1] || "misc";
+    return `etc/${theme}/${file}`;
+  }
+
+  const categoryIndex = ["frames", "themes", "wrappers"].findIndex(x => parts.includes(x));
+  if (categoryIndex !== -1) {
+    const category = ["frames", "themes", "wrappers"][categoryIndex];
+    const i = parts.indexOf(category);
+    const folderParts = parts.slice(i + 1, -1);
+    const folder = folderParts.length ? folderParts.join("/") : category;
+    const outputName = file.toLowerCase().startsWith("splash.") ? `${folderParts.at(-1) || category}.${ext}` : file;
+    return `etc/${folder}/${outputName}`;
+  }
+
+  if (parts.includes("cloaks")) return `etc/cloaks/${file}`;
+  if (parts.includes("favicons")) return `etc/favicons/${file}`;
+
+  // Fallback for any other non-banner URL.
+  const stem = file.includes(".") ? file.slice(0, file.lastIndexOf(".")) : file;
+  return `etc/${stem}/${stem}.${ext}`;
+}
+
+const buildBtn = document.getElementById("build");
+const resetBtn = document.getElementById("reset");
+const logEl = document.getElementById("log");
+const statusEl = document.getElementById("status");
+const progressEl = document.getElementById("progress");
+document.getElementById("total").textContent = `${urls.length} URLs`;
+
+function log(message) {
+  logEl.textContent += `\n${message}`;
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+resetBtn.addEventListener("click", () => { logEl.textContent = "Log cleared."; });
+buildBtn.addEventListener("click", async () => {
+  if (typeof JSZip === "undefined") {
+    statusEl.textContent = "Could not load JSZip. Check your internet connection and reload.";
+    return;
+  }
+  buildBtn.disabled = true;
+  resetBtn.disabled = true;
+  logEl.textContent = "";
+  progressEl.style.width = "0%";
+  statusEl.textContent = "Downloading assets…";
+  const zip = new JSZip();
+  let succeeded = 0, failed = 0;
+
+  for (let i = 0; i < urls.length; i++) {
+    const url = urls[i];
+    const path = zipPath(url);
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const blob = await response.blob();
+      zip.file(path, blob);
+      succeeded++;
+      log(`✓ ${path}`);
+    } catch (error) {
+      failed++;
+      log(`✗ ${path} — ${error.message}`);
+    }
+    progressEl.style.width = `${Math.round(((i + 1) / urls.length) * 100)}%`;
+    statusEl.textContent = `Processed ${i + 1}/${urls.length} · ${succeeded} downloaded · ${failed} failed`;
+  }
+
+  if (succeeded === 0) {
+    statusEl.textContent = "No files downloaded. Check the URLs and browser CORS permissions.";
+  } else {
+    statusEl.textContent = "Creating objects.zip…";
+    try {
+      const blob = await zip.generateAsync({ type: "blob" });
+      const link = document.createElement("a");
+      const objectUrl = URL.createObjectURL(blob);
+      link.href = objectUrl;
+      link.download = "objects.zip";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 30000);
+      statusEl.textContent = `Done! ${succeeded} files added to objects.zip${failed ? `; ${failed} failed (see log)` : ""}.`;
+    } catch (error) {
+      statusEl.textContent = `ZIP creation failed: ${error.message}`;
+    }
+  }
+  buildBtn.disabled = false;
+  resetBtn.disabled = false;
+});
+</script>
+</body>
+</html>
